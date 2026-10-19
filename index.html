@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Circuitos Mini-Losi</title>
+<style>
+:root{--bg:#f6f6f8;--fg:#1d1d1f;--mut:#62626a;--card:#fff;--bd:#d9d9df;--acc:#2f6fc0;--acc-fg:#fff;--star:#f2a900;--star-off:#c9c9cf;--ok:#1f8a3a;--warn:#b25d00;--shadow:0 1px 3px rgba(0,0,0,.08)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141417;--fg:#ececf0;--mut:#a0a0aa;--card:#1f1f24;--bd:#34343c;--acc:#5b9be6;--acc-fg:#0d1420;--star:#ffc233;--star-off:#4a4a54;--ok:#4cc46c;--warn:#f0a050;--shadow:none}}
+:root[data-theme="dark"]{--bg:#141417;--fg:#ececf0;--mut:#a0a0aa;--card:#1f1f24;--bd:#34343c;--acc:#5b9be6;--acc-fg:#0d1420;--star:#ffc233;--star-off:#4a4a54;--ok:#4cc46c;--warn:#f0a050;--shadow:none}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--bd)}
+.bar{max-width:1200px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:17px;margin:0;font-weight:700}
+.who{margin-left:auto;color:var(--mut);font-size:13px}
+.who button{font:inherit;color:var(--acc);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline}
+nav{max-width:1200px;margin:0 auto;padding:0 16px;display:flex;gap:4px}
+nav button{font:inherit;font-weight:600;background:none;border:0;border-bottom:3px solid transparent;color:var(--mut);padding:8px 10px;cursor:pointer}
+nav button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--acc)}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.info{color:var(--mut);margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px}
+.card svg{width:100%;height:auto;display:block;border-radius:6px}
+.name{font-weight:700;font-size:13px;display:flex;justify-content:space-between;gap:6px}
+.name span{color:var(--mut);font-weight:500}
+.stars{display:flex;gap:2px}
+.stars button{font-size:26px;line-height:1;background:none;border:0;padding:2px;cursor:pointer;color:var(--star-off)}
+.stars button.on{color:var(--star)}
+.stars button:focus-visible{outline:2px solid var(--acc);border-radius:4px}
+textarea{width:100%;font:inherit;font-size:13px;resize:vertical;min-height:34px;border:1px solid var(--bd);border-radius:6px;padding:5px 7px;background:var(--bg);color:var(--fg)}
+.foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px}
+.btn{font:inherit;font-weight:600;background:var(--acc);color:var(--acc-fg);border:0;border-radius:8px;padding:10px 18px;cursor:pointer}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.sec{background:none;color:var(--acc);border:1px solid var(--acc)}
+.mut{color:var(--mut);font-size:13px}
+.state{font-size:12px;color:var(--mut)}
+.state.err{color:var(--warn)}
+.welcome{max-width:440px;margin:40px auto;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:22px;box-shadow:var(--shadow)}
+.welcome h2{margin:0 0 6px;font-size:20px}
+.welcome label{display:block;font-weight:600;margin:14px 0 4px}
+.welcome input{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg)}
+.welcome details{margin-top:16px;color:var(--mut)}
+.leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--mut);margin:0 0 14px}
+.leg span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--c);border:1px solid var(--bd);margin-right:4px;vertical-align:-1px}
+.empty{padding:30px 0;color:var(--mut)}
+.code{font-family:ui-monospace,Consolas,monospace;background:var(--card);border:1px solid var(--bd);border-radius:4px;padding:1px 5px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>Circuitos Mini-Losi</h1>
+    <div class="who" id="who"></div>
+  </div>
+  <nav id="tabs" class="hidden" role="tablist">
+    <button role="tab" id="t-votar" aria-selected="true">Puntuar</button>
+    <button role="tab" id="t-favs" aria-selected="false">Mis favoritos</button>
+  </nav>
+</header>
+<main id="main"><p class="empty">Cargando circuitos…</p></main>
+
+<script>
+"use strict";
+const KEY='mlosi_v1';
+let BANK=null, CFG={}, ESC=null, BYID={};
+let S=load();
+let tab='votar';
+
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&s.uid) return Object.assign({notas:{},ronda:[],cola:[]},s);}catch(e){}
+  return {uid:null,alias:'',notas:{},ronda:[],cola:[]};
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function nuevoUid(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';const r=crypto.getRandomValues(new Uint8Array(10));for(const x of r)s+=a[x%a.length];return s;}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ---------- conexión con la hoja de Google
+let estado='', estadoErr=false;
+async function enviar(){
+  if(!CFG.url||!S.cola.length) return;
+  const lote=S.cola.slice(0,50);
+  try{
+    await fetch(CFG.url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({items:lote})});
+    S.cola=S.cola.slice(lote.length); save(); estado='Guardado'; estadoErr=false;
+    if(S.cola.length) return enviar();
+  }catch(e){estado='Sin conexión: se enviará más tarde'; estadoErr=true;}
+  pintarEstado();
+}
+function anotar(id,cambio){
+  const n=S.notas[id]||{e:0,c:''}; Object.assign(n,cambio,{t:new Date().toISOString()});
+  S.notas[id]=n;
+  S.cola=S.cola.filter(x=>x.circuito!==id);
+  S.cola.push({uid:S.uid,alias:S.alias,circuito:id,e:n.e,c:n.c,t:n.t});
+  save(); estado='Guardando…'; estadoErr=false; pintarEstado(); enviar();
+}
+async function recuperar(codigo){
+  const r=await fetch(CFG.url+'?accion=mias&uid='+encodeURIComponent(codigo));
+  const d=await r.json(); if(!d||!d.notas) throw new Error('sin datos'); return d;
+}
+
+// ---------- parecido entre circuitos (igual que el script de Python)
+function jaccard(a,b){let i=0,j=0,c=0;while(i<a.length&&j<b.length){if(a[i]===b[j]){c++;i++;j++;}else if(a[i]<b[j])i++;else j++;}return c/(a.length+b.length-c);}
+function escalas(){
+  const n=BANK.medidas.length, cs=BANK.circuitos, out=[];
+  for(let f=0;f<n;f++){const vs=cs.map(c=>c.m[f]);const mu=vs.reduce((a,b)=>a+b,0)/vs.length;out.push(Math.max(Math.sqrt(vs.reduce((a,v)=>a+(v-mu)**2,0)/vs.length),1e-6));}
+  return out;
+}
+function predecir(c,val,k=5){
+  const ds=val.map(v=>{
+    const dj=1-jaccard(c.e,v.c.e);
+    let s=0; for(let f=0;f<ESC.length;f++) s+=((c.m[f]-v.c.m[f])/ESC[f])**2;
+    const df=Math.sqrt(s/ESC.length);
+    return [0.5*dj+0.5*Math.min(df/2,1),v.e];
+  }).sort((a,b)=>a[0]-b[0]).slice(0,k);
+  const w=ds.map(([d])=>1/(d+0.05));
+  return ds.reduce((a,[,e],i)=>a+w[i]*e,0)/w.reduce((a,b)=>a+b,0);
+}
+function mezclar(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function nuevaRonda(){
+  const n=CFG.ronda||5, maxSim=CFG.max_sim??0.6;
+  const vistos=new Set(Object.keys(S.notas).filter(k=>S.notas[k].e>0));
+  const libres=BANK.circuitos.filter(c=>!vistos.has(c.id));
+  const val=[...vistos].filter(k=>BYID[k]).map(k=>({c:BYID[k],e:S.notas[k].e}));
+  const distinto=(c,out)=>out.every(o=>jaccard(c.e,o.e)<=maxSim);
+  let out=[];
+  if(val.length>=(CFG.min_val||5)){
+    const nExpl=Math.min(CFG.explorar??1,n-1);
+    const orden=libres.map(c=>[predecir(c,val),c]).sort((a,b)=>b[0]-a[0]);
+    for(const [,c] of orden){if(out.length>=n-nExpl)break;if(distinto(c,out))out.push(c);}
+    const resto=mezclar(libres.filter(c=>!out.includes(c)));
+    for(const c of resto){if(out.length>=n)break;if(distinto(c,out))out.push(c);}
+  }else{
+    for(const c of mezclar(libres.slice())){if(out.length>=n)break;if(distinto(c,out))out.push(c);}
+  }
+  for(const c of mezclar(libres.slice())){if(out.length>=n)break;if(!out.includes(c))out.push(c);}
+  S.ronda=out.map(c=>c.id); save();
+}
+
+// ---------- pintar
+function estrellas(id){
+  const e=(S.notas[id]||{}).e||0;
+  let h=`<div class="stars" role="radiogroup" aria-label="Estrellas para ${id}">`;
+  for(let i=1;i<=5;i++) h+=`<button type="button" data-id="${id}" data-e="${i}" class="${i<=e?'on':''}" role="radio" aria-checked="${i===e}" aria-label="${i} estrella${i>1?'s':''}">★</button>`;
+  return h+'</div>';
+}
+function tarjeta(id){
+  const c=BYID[id], n=S.notas[id]||{};
+  return `<div class="card"><div class="name">${id}</div>${c.svg}${estrellas(id)}
+    <textarea data-id="${id}" placeholder="¿Qué te gusta o no? (opcional)" rows="1">${esc(n.c||'')}</textarea></div>`;
+}
+const LEG=`<div class="leg"><span style="--c:#2e2e33">carril</span><span style="--c:#3d7fd0">isleta</span><span style="--c:#c4c4c4">tubo</span><span style="--c:#8e8e96">plano</span><span style="--c:#6b6b72">rampa / recepción</span><span>P pequeño · M mediano · E meseta · G meseta grande</span></div>`;
+function pintarEstado(){
+  const el=document.getElementById('estado'); if(!el) return;
+  el.textContent=!CFG.url?'Modo prueba: las estrellas solo se guardan en este navegador':(S.cola.length&&!estado?'Pendiente de enviar':estado);
+  el.className='state'+(estadoErr||!CFG.url?' err':'');
+}
+function pintar(){
+  const main=document.getElementById('main'), who=document.getElementById('who'), tabs=document.getElementById('tabs');
+  if(!S.uid){tabs.classList.add('hidden');who.innerHTML='';return pintarBienvenida(main);}
+  tabs.classList.remove('hidden');
+  who.innerHTML=`${esc(S.alias)} · código <span class="code">${S.uid}</span> · <button type="button" id="salir">cambiar</button>`;
+  const favs=Object.keys(S.notas).filter(k=>BYID[k]&&S.notas[k].e>=(CFG.min_fav||4)).sort((a,b)=>S.notas[b].e-S.notas[a].e||a.localeCompare(b));
+  document.getElementById('t-favs').textContent=`Mis favoritos (${favs.length})`;
+  for(const [t,b] of [['votar','t-votar'],['favs','t-favs']]) document.getElementById(b).setAttribute('aria-selected',String(tab===t));
+  const total=BANK.circuitos.length, hechas=Object.keys(S.notas).filter(k=>BYID[k]&&S.notas[k].e>0).length;
+  if(tab==='favs'){
+    main.innerHTML=`<p class="info">Los circuitos a los que has dado ${CFG.min_fav||4} estrellas o más. Puedes cambiar la nota aquí también.</p>${LEG}`+
+      (favs.length?`<div class="grid">${favs.map(tarjeta).join('')}</div>`:`<p class="empty">Todavía no tienes favoritos.</p>`)+
+      `<div class="foot"><span class="state" id="estado"></span></div>`;
+    return pintarEstado();
+  }
+  S.ronda=S.ronda.filter(id=>BYID[id]);
+  if(!S.ronda.length) nuevaRonda();
+  if(!S.ronda.length){main.innerHTML=`<p class="empty">¡Has puntuado los ${total} circuitos! Gracias.</p>`;return;}
+  const faltan=S.ronda.filter(id=>!(S.notas[id]&&S.notas[id].e>0)).length;
+  const aprende=hechas>=(CFG.min_val||5);
+  main.innerHTML=`<p class="info">Puntúa cada circuito de 1 a 5 estrellas. ${aprende?'Los siguientes se eligen según lo que has puntuado alto.':`Cuando lleves ${CFG.min_val||5} puntuados, los siguientes se parecerán a los que más te gusten.`} Llevas ${hechas} de ${total}.</p>${LEG}
+    <div class="grid">${S.ronda.map(tarjeta).join('')}</div>
+    <div class="foot"><button class="btn" id="mas" ${faltan?'disabled':''}>${faltan?`Puntúa ${faltan} más para seguir`:`Ver ${CFG.ronda||5} circuitos más`}</button><span class="state" id="estado"></span></div>`;
+  pintarEstado();
+}
+function pintarBienvenida(main){
+  main.innerHTML=`<form class="welcome" id="entrar">
+    <h2>Puntúa circuitos</h2>
+    <p class="mut">Verás los circuitos de ${CFG.ronda||5} en ${CFG.ronda||5}. Cuantos más puntúes, más se parecerán los siguientes a los que te gustan.</p>
+    <label for="alias">Tu nombre</label>
+    <input id="alias" maxlength="30" required autocomplete="nickname" value="${esc(S.alias||'')}">
+    <div class="foot"><button class="btn" type="submit">Empezar</button></div>
+    ${CFG.url?`<details><summary>Ya he puntuado en otro móvil u ordenador</summary>
+      <label for="codigo">Tu código personal</label><input id="codigo" maxlength="12" autocomplete="off" style="text-transform:uppercase">
+      <div class="foot"><button class="btn sec" type="button" id="recup">Recuperar mis notas</button><span class="state" id="rmsg"></span></div></details>`:''}
+  </form>`;
+}
+
+// ---------- eventos
+document.addEventListener('click',async ev=>{
+  const b=ev.target.closest('button'); if(!b) return;
+  if(b.dataset.e){anotar(b.dataset.id,{e:+b.dataset.e});pintar();return;}
+  if(b.id==='mas'){S.ronda=[];nuevaRonda();pintar();window.scrollTo({top:0,behavior:'smooth'});return;}
+  if(b.id==='t-votar'||b.id==='t-favs'){tab=b.id==='t-votar'?'votar':'favs';pintar();return;}
+  if(b.id==='salir'){if(confirm('¿Salir? Para volver a ver tus notas en otro dispositivo necesitarás tu código: '+S.uid)){localStorage.removeItem(KEY);S=load();tab='votar';pintar();}return;}
+  if(b.id==='recup'){
+    const cod=document.getElementById('codigo').value.trim().toUpperCase(), m=document.getElementById('rmsg');
+    if(!cod) return; m.textContent='Buscando…'; m.className='state';
+    try{const d=await recuperar(cod); if(!Object.keys(d.notas).length) throw 0;
+      S={uid:cod,alias:d.alias||document.getElementById('alias').value.trim()||'sin nombre',notas:d.notas,ronda:[],cola:[]};save();pintar();}
+    catch(e){m.textContent='No hay notas con ese código';m.className='state err';}
+  }
+});
+document.addEventListener('submit',ev=>{
+  if(ev.target.id!=='entrar') return; ev.preventDefault();
+  const a=document.getElementById('alias').value.trim(); if(!a) return;
+  S.uid=S.uid||nuevoUid(); S.alias=a; save(); pintar();
+});
+document.addEventListener('change',ev=>{
+  const t=ev.target; if(t.tagName==='TEXTAREA'&&t.dataset.id) anotar(t.dataset.id,{c:t.value.slice(0,500)});
+});
+window.addEventListener('online',enviar);
+
+fetch('tanda.json').then(r=>r.json()).then(d=>{
+  BANK=d; CFG=d.config||{}; for(const c of d.circuitos) BYID[c.id]=c; ESC=escalas(); pintar(); enviar();
+}).catch(()=>{document.getElementById('main').innerHTML='<p class="empty">No se han podido cargar los circuitos.</p>';});
+</script>
+</body>
+</html>
